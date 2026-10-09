@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมทายหัว-ก้อย</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+            user-select: none;
+            -webkit-user-select: none;
+            position: relative;
+        }
+
+        /* 🔍 โซนปุ่มล่องหนด้านบนสุดสำหรับคนควบคุม */
+        .secret-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px; /* ความสูงของพื้นที่ลับด้านบน */
+            display: flex;
+            z-index: 9999;
+        }
+        .secret-zone {
+            flex: 1;
+            height: 100%;
+            background: transparent; /* โปร่งใส 100% มองไม่เห็น */
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        h1 {
+            margin-bottom: 25px;
+            color: #2c3e50;
+            font-size: 24px;
+        }
+        .coin-area {
+            margin: 40px 0;
+            perspective: 1000px;
+        }
+        .coin {
+            width: 130px;
+            height: 130px;
+            background-color: #f1c40f;
+            border-radius: 50%;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            font-weight: bold;
+            color: #fff;
+            border: 5px solid #f39c12;
+            box-shadow: 0 6px 0 #d35400;
+            transition: transform 0.5s ease;
+        }
+        .coin.head { background-color: #f1c40f; border-color: #f39c12; box-shadow: 0 6px 0 #d35400; }
+        .coin.tail { background-color: #3498db; border-color: #2980b9; box-shadow: 0 6px 0 #21618c; }
+        
+        .choice-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .btn {
+            flex: 1;
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent; /* ปิดแสงไฮไลท์สีฟ้าเวลาชนบนมือถือ */
+        }
+        .btn-head { background-color: #f1c40f; color: white; }
+        .btn-head:hover { background-color: #f39c12; }
+        .btn-tail { background-color: #3498db; color: white; }
+        .btn-tail:hover { background-color: #2980b9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .result {
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 15px;
+            min-height: 35px;
+        }
+        .win { color: #27ae60; }
+        .lose { color: #e74c3c; }
+
+        .stats {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-around;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+
+<!-- แถบลับล่องหน (ผู้เล่นมองไม่เห็น แต่จิ้มได้) -->
+<div class="secret-bar">
+    <div class="secret-zone" onclick="changeMode('cheat')"></div>  <!-- จิ้มบนซ้าย = โกง -->
+    <div class="secret-zone" onclick="changeMode('normal')"></div> <!-- จิ้มบนกลาง = ปกติ -->
+    <div class="secret-zone" onclick="changeMode('win')"></div>    <!-- จิ้มบนขวา = ชนะ -->
+</div>
+
+<div class="container">
+    <h1>เกมทายหัว-ก้อย</h1>
+
+    <!-- เหรียญแสดงผล -->
+    <div class="coin-area">
+        <div id="coinVisual" class="coin head">หัว</div>
+    </div>
+
+    <p style="font-weight: bold; color: #555;">เลือกสิ่งที่คุณต้องการทาย:</p>
+    
+    <!-- ปุ่มกดเลือกทาย -->
+    <div class="choice-buttons">
+        <button class="btn btn-head" onclick="playGame('หัว')">ทาย หัว</button>
+        <button class="btn btn-tail" onclick="playGame('ก้อย')">ทาย ก้อย</button>
+    </div>
+
+    <!-- ข้อความผลลัพธ์ -->
+    <div id="resultText" class="result"></div>
+
+    <!-- สถิติการเล่น -->
+    <div class="stats">
+        <div>ชนะ: <span id="winCount" style="color:#27ae60; font-weight:bold;">0</span></div>
+        <div>แพ้: <span id="loseCount" style="color:#e74c3c; font-weight:bold;">0</span></div>
+        <div>อัตราชนะ: <span id="winRate" style="font-weight:bold;">0%</span></div>
+    </div>
+</div>
+
+<script>
+    let win = 0;
+    let lose = 0;
+    
+    // โหมดเริ่มต้น: 'cheat' = บังคับแพ้, 'normal' = สุ่มจริง, 'win' = บังคับชนะ
+    let currentMode = 'cheat'; 
+
+    // ฟังก์ชันเปลี่ยนโหมดลับ
+    function changeMode(mode) {
+        currentMode = mode;
+        
+        // สั่นเตือนเบาๆ ในมือถือระบบ Android (iOS ในบางเบราว์เซอร์อาจไม่รองรับการสั่งสั่นจากเว็บ)
+        if (navigator.vibrate) {
+            navigator.vibrate(40); 
+        }
+        
+        console.log("สลับโหมดเป็น: " + currentMode);
+    }
+
+    function playGame(playerChoice) {
+        const resultText = document.getElementById('resultText');
+        const coinVisual = document.getElementById('coinVisual');
+        
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(btn => btn.disabled = true);
+        resultText.innerText = "กำลังเหวี่ยงเหรียญ...";
+        resultText.className = "result";
+
+        let ticks = 0;
+        let interval = setInterval(() => {
+            coinVisual.innerText = ticks % 2 === 0 ? "หัว" : "ก้อย";
+            coinVisual.className = ticks % 2 === 0 ? "coin head" : "coin tail";
+            ticks++;
+            
+            if(ticks > 8) {
+                clearInterval(interval);
+                
+                let finalResult = "";
+
+                // เลือกผลลัพธ์ตามโหมดล่องหนที่คนคุมแอบจิ้มไว้ล่าสุด
+                if (currentMode === 'cheat') {
+                    finalResult = (playerChoice === 'หัว') ? 'ก้อย' : 'หัว';
+                } 
+                else if (currentMode === 'win') {
+                    finalResult = playerChoice;
+                } 
+                else {
+                    finalResult = Math.random() < 0.5 ? 'หัว' : 'ก้อย';
+                }
+
+                // แสดงหน้าเหรียญจริง
+                if (finalResult === 'หัว') {
+                    coinVisual.innerText = "หัว";
+                    coinVisual.className = "coin head";
+                } else {
+                    coinVisual.innerText = "ก้อย";
+                    coinVisual.className = "coin tail";
+                }
+
+                // สรุปแต้ม
+                if (playerChoice === finalResult) {
+                    resultText.innerText = `ออก ${finalResult} ! คุณทายถูก 🎉`;
+                    resultText.className = "result win";
+                    win++;
+                } else {
+                    resultText.innerText = `ออก ${finalResult} ! คุณทายผิด ❌`;
+                    resultText.className = "result lose";
+                    lose++;
+                }
+
+                // อัปเดตสถิติ
+                document.getElementById('winCount').innerText = win;
+                document.getElementById('loseCount').innerText = lose;
+                const totalGames = win + lose;
+                const percent = totalGames > 0 ? Math.round((win / totalGames) * 100) : 0;
+                document.getElementById('winRate').innerText = percent + "%";
+
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }, 100);
+    }
+</script>
+
+</body>
+</html>
